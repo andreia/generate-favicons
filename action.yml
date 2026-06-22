@@ -124,12 +124,12 @@ runs:
       id: generate
       shell: bash
       env:
-        IMAGE_PATH:   ${{ inputs.image }}
-        OUTPUT_DIR:   ${{ inputs.output_path }}
-        PRESET:       ${{ inputs.preset }}
-        CUSTOM_SIZES: ${{ inputs.sizes }}
-        BG_COLOR:     ${{ inputs.background_color }}
-        FORCE:        ${{ inputs.force }}
+        FAVICON_IMAGE_PATH: ${{ inputs.image }}
+        FAVICON_OUTPUT_DIR: ${{ inputs.output_path }}
+        FAVICON_PRESET:     ${{ inputs.preset }}
+        FAVICON_CUSTOM_SIZES: ${{ inputs.sizes }}
+        FAVICON_BG_COLOR:   ${{ inputs.background_color }}
+        FAVICON_FORCE:      ${{ inputs.force }}
         ACTION_PATH:  ${{ github.action_path }}
       run: bash "$ACTION_PATH/scripts/generate-favicons.sh"
 
@@ -138,13 +138,13 @@ runs:
       if: ${{ inputs.commit == 'true' && steps.generate.outputs.skipped == 'false' }}
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ github.token }}
-        OUTPUT_DIR:   ${{ inputs.output_path }}
-        MSG:          ${{ inputs.commit_message }}
+        GITHUB_TOKEN:       ${{ github.token }}
+        FAVICON_OUTPUT_DIR: ${{ inputs.output_path }}
+        MSG:                ${{ inputs.commit_message }}
       run: |
         git config user.name  "Automated action"
         git config user.email "actions@users.noreply.github.com"
-        git add "$OUTPUT_DIR"
+        git add "$FAVICON_OUTPUT_DIR"
         if git diff --staged --quiet; then
           echo "Nothing new to commit."
         else

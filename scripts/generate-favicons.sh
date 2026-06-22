@@ -4,15 +4,15 @@
 # Called by action.yml. All configuration comes from environment variables.
 #
 # Can also be run locally:
-#   IMAGE_PATH=logo.svg PRESET=all OUTPUT_DIR=favicons bash scripts/generate-favicons.sh
+#   FAVICON_IMAGE_PATH=logo.svg FAVICON_PRESET=all FAVICON_OUTPUT_DIR=favicons bash scripts/generate-favicons.sh
 #
 # Env vars:
-#   IMAGE_PATH      (required) path to source image
-#   OUTPUT_DIR      where to write output               [default: public/favicons]
-#   PRESET          ico-only|minimal|extended|all|custom [default: all]
-#   CUSTOM_SIZES    comma list, only when PRESET=custom
-#   BG_COLOR        hex background for opaque tiles     [default: #ffffff]
-#   FORCE           true|false — skip if ICO exists     [default: false]
+#   FAVICON_IMAGE_PATH  (required) path to source image
+#   FAVICON_OUTPUT_DIR  where to write output               [default: public/favicons]
+#   FAVICON_PRESET      ico-only|minimal|extended|all|custom [default: all]
+#   FAVICON_CUSTOM_SIZES comma list, only when FAVICON_PRESET=custom
+#   FAVICON_BG_COLOR    hex background for opaque tiles     [default: #ffffff]
+#   FAVICON_FORCE       true|false — skip if ICO exists     [default: false]
 #   GITHUB_OUTPUT   set automatically by GitHub Actions runner
 # =============================================================================
 set -euo pipefail
@@ -35,12 +35,12 @@ set_output() {
 }
 
 # ── Read configuration from env ───────────────────────────────────────────────
-IMAGE_PATH="${IMAGE_PATH:-}"
-OUTPUT_DIR="${OUTPUT_DIR:-public/favicons}"
-PRESET="${PRESET:-all}"
-CUSTOM_SIZES="${CUSTOM_SIZES:-}"
-BG_COLOR="${BG_COLOR:-#ffffff}"
-FORCE="${FORCE:-false}"
+IMAGE_PATH="${FAVICON_IMAGE_PATH:-}"
+OUTPUT_DIR="${FAVICON_OUTPUT_DIR:-public/favicons}"
+PRESET="${FAVICON_PRESET:-all}"
+CUSTOM_SIZES="${FAVICON_CUSTOM_SIZES:-}"
+BG_COLOR="${FAVICON_BG_COLOR:-#ffffff}"
+FORCE="${FAVICON_FORCE:-false}"
 
 # ── Preset → size mappings ─────────────────────────────────────────────────────
 declare -A PRESET_SIZES
@@ -51,11 +51,11 @@ PRESET_SIZES["all"]="16 24 32 48 57 60 64 70 72 76 96 114 120 128 144 150 152 16
 PRESET_SIZES["custom"]=""
 
 # ── Validate inputs ────────────────────────────────────────────────────────────
-[[ -z "$IMAGE_PATH" ]]   && error "IMAGE_PATH is not set."
+[[ -z "$IMAGE_PATH" ]]   && error "FAVICON_IMAGE_PATH is not set."
 [[ ! -f "$IMAGE_PATH" ]] && error "Source image not found: '$IMAGE_PATH'"
 
 if [[ "$PRESET" == "custom" ]]; then
-  [[ -z "$CUSTOM_SIZES" ]] && error "PRESET=custom requires CUSTOM_SIZES (e.g. '16,32,180')."
+  [[ -z "$CUSTOM_SIZES" ]] && error "FAVICON_PRESET=custom requires FAVICON_CUSTOM_SIZES (e.g. '16,32,180')."
   PRESET_SIZES["custom"]=$(echo "$CUSTOM_SIZES" | tr ',' ' ' | tr -s ' ')
 fi
 
