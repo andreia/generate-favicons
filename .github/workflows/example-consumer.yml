@@ -1,0 +1,58 @@
+name: 🖼️ Generate Favicons
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Regenerate even if favicons already exist?"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+
+  push:
+    branches: [main]
+    paths:
+      - "assets/logo.svg"   # ← change to your source image path
+
+permissions:
+  contents: write   # required only when commit: true
+
+jobs:
+  favicons:
+    name: Generate favicon set
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate favicons
+        id: favicons
+        uses: andreia/generate-favicons@v1
+        with:
+          image:            assets/logo.svg      # path to your source image
+          output_path:      public/favicons       # where to write all files
+          preset:           all                   # ico-only | minimal | extended | all | custom
+          # sizes:          "16,32,96,180,192"    # only used when preset: custom
+          background_color: "#ffffff"             # for opaque Metro tile variants
+          force:            ${{ github.event.inputs.force || 'false' }}
+          commit:           "true"
+          commit_message:   "chore: update favicons [skip ci]"
+
+      - name: Show result
+        run: |
+          if [[ "${{ steps.favicons.outputs.skipped }}" == "true" ]]; then
+            echo "⏭️  Skipped — favicons already up to date."
+          else
+            echo "✅  Generated ${{ steps.favicons.outputs.files_generated }} files"
+            echo "    Output: ${{ steps.favicons.outputs.output_path }}"
+          fi
+
+      - name: Upload artifact
+        if: steps.favicons.outputs.skipped == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: favicons
+          path: public/favicons/
+          retention-days: 30

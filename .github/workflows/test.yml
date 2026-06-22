@@ -1,0 +1,220 @@
+name: 🧪 Self-test
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "action.yml"
+      - "scripts/**"
+      - ".github/workflows/test.yml"
+  pull_request:
+    paths:
+      - "action.yml"
+      - "scripts/**"
+  workflow_dispatch:
+
+jobs:
+  # ── Matrix: one job per preset ─────────────────────────────────────────────
+  test-presets:
+    name: Preset — ${{ matrix.preset }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [ico-only, minimal, extended, all, custom]
+
+    steps:
+      - name: Checkout action source
+        uses: actions/checkout@v4
+
+      - name: Create test SVG
+        run: |
+          mkdir -p test-assets
+          cat > test-assets/logo.svg << 'SVG'
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <defs>
+              <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%"   stop-color="#6366f1"/>
+                <stop offset="100%" stop-color="#ec4899"/>
+              </linearGradient>
+            </defs>
+            <rect width="100" height="100" rx="20" fill="url(#g)"/>
+            <text x="50" y="68" font-size="52" font-family="sans-serif"
+                  font-weight="bold" fill="white" text-anchor="middle">F</text>
+          </svg>
+          SVG
+
+      - name: Run action (preset=${{ matrix.preset }})
+        id: favicons
+        uses: ./
+        with:
+          image:            test-assets/logo.svg
+          output_path:      _out/${{ matrix.preset }}
+          preset:           ${{ matrix.preset }}
+          sizes:            ${{ matrix.preset == 'custom' && '16,32,96,180,192' || '' }}
+          background_color: "#6366f1"
+          force:            "true"
+
+      - name: Verify action outputs
+        run: |
+          echo "skipped         = ${{ steps.favicons.outputs.skipped }}"
+          echo "output_path     = ${{ steps.favicons.outputs.output_path }}"
+          echo "files_generated = ${{ steps.favicons.outputs.files_generated }}"
+          echo "favicon_ico     = ${{ steps.favicons.outputs.favicon_ico }}"
+
+          [[ "${{ steps.favicons.outputs.skipped }}" == "false" ]] || \
+            { echo "::error::Expected skipped=false"; exit 1; }
+          [[ "${{ steps.favicons.outputs.files_generated }}" -gt 0 ]] || \
+            { echo "::error::Expected files_generated > 0"; exit 1; }
+
+      - name: Verify required files
+        run: |
+          OUT="_out/${{ matrix.preset }}"
+          FAIL=0
+
+          check() {
+            if [[ -f "$OUT/$1" ]]; then printf '  ✔  %s\n' "$1"
+            else printf '  ✖  MISSING: %s\n' "$1" >&2; FAIL=$((FAIL+1)); fi
+          }
+
+          check "favicon.ico"
+          check "favicon-snippet.html"
+          check "generation.log"
+
+          case "${{ matrix.preset }}" in
+            minimal)
+              check "favicon-144x144.png"
+              check "favicon-152x152.png"
+              ;;
+            extended)
+              for s in 16 32 57 72 120 144 152 192; do check "favicon-${s}x${s}.png"; done
+              ;;
+            all)
+              for s in 16 32 57 96 144 152 192 310; do check "favicon-${s}x${s}.png"; done
+              check "browserconfig.xml"
+              check "site.webmanifest"
+              check "mstile-310x150.png"
+              ;;
+            custom)
+              for s in 16 32 96 180 192; do check "favicon-${s}x${s}.png"; done
+              ;;
+          esac
+
+          [[ $FAIL -eq 0 ]] || { echo "::error::$FAIL file(s) missing."; exit 1; }
+          echo "All checks passed ✅"
+
+      - name: Upload test artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-favicons-${{ matrix.preset }}
+          path: _out/${{ matrix.preset }}/
+          retention-days: 3
+
+  # ── Skip / force logic ─────────────────────────────────────────────────────
+  test-skip-logic:
+    name: Skip & force behaviour
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create test SVG
+        run: |
+          mkdir -p test-assets
+          cat > test-assets/logo.svg << 'SVG'
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <rect width="100" height="100" rx="20" fill="#6366f1"/>
+            <text x="50" y="68" font-size="52" font-family="sans-serif"
+                  fill="white" text-anchor="middle">S</text>
+          </svg>
+          SVG
+
+      - name: First run — generates favicons
+        id: first
+        uses: ./
+        with:
+          image:       test-assets/logo.svg
+          output_path: _skip_test
+          preset:      minimal
+          force:       "false"
+
+      - name: Assert first run generated files
+        run: |
+          [[ "${{ steps.first.outputs.skipped }}" == "false" ]] || \
+            { echo "::error::First run should NOT be skipped"; exit 1; }
+          [[ "${{ steps.first.outputs.files_generated }}" -gt 0 ]] || \
+            { echo "::error::First run should generate files"; exit 1; }
+          echo "First run: ${{ steps.first.outputs.files_generated }} files ✅"
+
+      - name: Second run — should be skipped (force=false)
+        id: second
+        uses: ./
+        with:
+          image:       test-assets/logo.svg
+          output_path: _skip_test
+          preset:      minimal
+          force:       "false"
+
+      - name: Assert second run was skipped
+        run: |
+          [[ "${{ steps.second.outputs.skipped }}" == "true" ]] || \
+            { echo "::error::Second run SHOULD be skipped"; exit 1; }
+          [[ "${{ steps.second.outputs.files_generated }}" == "0" ]] || \
+            { echo "::error::Expected 0 files on skipped run"; exit 1; }
+          echo "Second run correctly skipped ✅"
+
+      - name: Third run — force=true should regenerate
+        id: third
+        uses: ./
+        with:
+          image:       test-assets/logo.svg
+          output_path: _skip_test
+          preset:      minimal
+          force:       "true"
+
+      - name: Assert third run regenerated
+        run: |
+          [[ "${{ steps.third.outputs.skipped }}" == "false" ]] || \
+            { echo "::error::Third run (force=true) should NOT be skipped"; exit 1; }
+          echo "Third run correctly regenerated ✅"
+
+  # ── Raster source ──────────────────────────────────────────────────────────
+  test-png-source:
+    name: PNG source image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ImageMagick (to create test PNG)
+        run: sudo apt-get install -y --no-install-recommends imagemagick
+
+      - name: Create 512×512 test PNG
+        run: |
+          mkdir -p test-assets
+          convert -size 512x512 gradient:"#6366f1-#ec4899" \
+            -gravity center -pointsize 180 -fill white -annotate 0 "F" \
+            test-assets/logo.png
+
+      - name: Run action with PNG source
+        id: png_run
+        uses: ./
+        with:
+          image:       test-assets/logo.png
+          output_path: _out_png
+          preset:      extended
+          force:       "true"
+
+      - name: Verify PNG source output
+        run: |
+          for f in favicon.ico favicon-16x16.png favicon-32x32.png favicon-192x192.png favicon-snippet.html; do
+            [[ -f "_out_png/$f" ]] && echo "  ✔  $f" || { echo "  ✖  $f MISSING"; exit 1; }
+          done
+          echo "PNG source test passed ✅"
+
+      - name: Upload PNG test artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-favicons-png-source
+          path: _out_png/
+          retention-days: 3

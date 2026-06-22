@@ -1,0 +1,154 @@
+name: "Generate Favicons"
+description: >
+  Generate a complete favicon set (ICO, PNG, webmanifest, browserconfig, HTML snippet)
+  from a single SVG or raster source image. Skips generation if favicons already exist
+  unless force is set to true.
+
+branding:
+  icon: image
+  color: purple
+
+# ── Inputs ────────────────────────────────────────────────────────────────────
+inputs:
+
+  image:
+    description: >
+      Path to the source image relative to the repository root.
+      SVG is strongly recommended (best quality at all sizes).
+      Also accepts PNG, JPG, WEBP, GIF — use 512×512 px or larger for raster sources.
+    required: true
+
+  output_path:
+    description: >
+      Directory (relative to the repo root) where all favicon files will be written.
+      Will be created if it does not exist.
+    required: false
+    default: "public/favicons"
+
+  preset:
+    description: |
+      Favicon size preset:
+        ico-only  — favicon.ico only (16×16 + 32×32 layers)
+        minimal   — ICO + 16, 32, 144, 152 px (iOS/IE basics)
+        extended  — ICO + all major iOS & Android sizes
+        all       — Every known size, manifests and HTML snippet (recommended)
+        custom    — Provide exact sizes via the `sizes` input
+    required: false
+    default: "all"
+
+  sizes:
+    description: >
+      Comma-separated pixel sizes used when preset is "custom".
+      Example: 16,32,96,180,192
+      Allowed values: 16 24 32 48 57 60 64 70 72 76 96 114 120 128 144 150 152 167 180 192 196 256 310
+    required: false
+    default: ""
+
+  background_color:
+    description: >
+      Hex background color for opaque tile variants (Windows Metro / IE tiles).
+      Use "none" to keep full transparency everywhere.
+    required: false
+    default: "#ffffff"
+
+  force:
+    description: >
+      Set to "true" to regenerate all favicons even if they already exist in
+      output_path. When "false" (default), the action skips generation entirely
+      if favicon.ico is already present, making it safe to run on every push
+      without unnecessary work.
+    required: false
+    default: "false"
+
+  commit:
+    description: >
+      Set to "true" to automatically commit the generated favicons back to the
+      repository. The workflow must have contents: write permission.
+    required: false
+    default: "false"
+
+  commit_message:
+    description: "Commit message used when commit is true."
+    required: false
+    default: "chore: update favicons [skip ci]"
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+
+  skipped:
+    description: >
+      "true" if generation was skipped because favicons already existed and
+      force was not set. "false" if favicons were (re)generated.
+    value: ${{ steps.generate.outputs.skipped }}
+
+  output_path:
+    description: "Absolute path to the directory containing the generated favicons."
+    value: ${{ steps.generate.outputs.output_path }}
+
+  files_generated:
+    description: "Number of favicon files written (0 when skipped)."
+    value: ${{ steps.generate.outputs.files_generated }}
+
+  favicon_ico:
+    description: "Absolute path to the generated favicon.ico file (empty when skipped)."
+    value: ${{ steps.generate.outputs.favicon_ico }}
+
+# ── Implementation ─────────────────────────────────────────────────────────────
+runs:
+  using: composite
+  steps:
+
+    # 1 ── Install system dependencies ─────────────────────────────────────────
+    - name: Install image tools
+      shell: bash
+      run: |
+        sudo apt-get update -q
+        sudo apt-get install -y --no-install-recommends \
+          imagemagick \
+          inkscape \
+          librsvg2-bin \
+          optipng \
+          file
+
+        # Relax ImageMagick's default ICO write restriction present on some
+        # Ubuntu builds
+        sudo sed -i \
+          's|<policy domain="coder" rights="none" pattern="ICO" />||g' \
+          /etc/ImageMagick-6/policy.xml 2>/dev/null || true
+        sudo sed -i \
+          's|rights="none" pattern="ICO"|rights="read|write" pattern="ICO"|g' \
+          /etc/ImageMagick-6/policy.xml 2>/dev/null || true
+
+    # 2 ── Run the generator ───────────────────────────────────────────────────
+    - name: Generate favicons
+      id: generate
+      shell: bash
+      env:
+        IMAGE_PATH:   ${{ inputs.image }}
+        OUTPUT_DIR:   ${{ inputs.output_path }}
+        PRESET:       ${{ inputs.preset }}
+        CUSTOM_SIZES: ${{ inputs.sizes }}
+        BG_COLOR:     ${{ inputs.background_color }}
+        FORCE:        ${{ inputs.force }}
+        ACTION_PATH:  ${{ github.action_path }}
+      run: bash "$ACTION_PATH/scripts/generate-favicons.sh"
+
+    # 3 ── (Optional) commit results ───────────────────────────────────────────
+    - name: Commit favicons to repository
+      if: ${{ inputs.commit == 'true' && steps.generate.outputs.skipped == 'false' }}
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        OUTPUT_DIR:   ${{ inputs.output_path }}
+        MSG:          ${{ inputs.commit_message }}
+      run: |
+        git config user.name  "Automated action"
+        git config user.email "actions@users.noreply.github.com"
+        git add "$OUTPUT_DIR"
+        if git diff --staged --quiet; then
+          echo "Nothing new to commit."
+        else
+          git commit -m "$MSG"
+          git push
+          echo "✔ Favicons committed."
+        fi
