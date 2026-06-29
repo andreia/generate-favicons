@@ -1,8 +1,5 @@
 name: "Generate Favicons"
-description: >
-  Generate a complete favicon set (ICO, PNG, webmanifest, browserconfig, HTML snippet)
-  from a single SVG or raster source image. Skips generation if favicons already exist
-  unless force is set to true.
+description: "Generate ICO, PNG, webmanifest and browserconfig favicons from a single SVG or raster source image."
 
 branding:
   icon: image
