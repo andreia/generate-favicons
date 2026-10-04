@@ -1,10 +1,10 @@
-# Generate Favicons Action
+# Faviconie - Generate Favicons Action
+
+<img src="./art/logo.jpg" width="500" />
 
 Github Action to generate a complete, production-ready favicon set from a single source image — no online tools, no manual resizing, no data leaving your pipeline.
 
 Supports SVG (recommended), PNG, JPG, WEBP and GIF sources. Outputs ICO, all PNG sizes, `site.webmanifest`, `browserconfig.xml`, and a ready-to-paste HTML snippet. Skips regeneration automatically if favicons already exist.
-
----
 
 ## Usage
 
@@ -40,8 +40,6 @@ jobs:
 ```
 
 > **Note:** The `paths:` filter is recommended so the action only runs when your source image actually changes. Even without it, the action exits instantly on subsequent runs because it skips generation when `favicon.ico` already exists.
-
----
 
 ## Inputs
 
@@ -95,8 +93,6 @@ The following outputs are available to subsequent steps via `steps.<step-id>.out
 - **`steps.favicons.outputs.favicon_ico`**
   Absolute path to the generated `favicon.ico`. Empty string when skipped.
 
----
-
 ## Examples
 
 ### Basic — generate and upload as artifact
@@ -118,8 +114,6 @@ The following outputs are available to subsequent steps via `steps.<step-id>.out
     name: favicons
     path: public/favicons/
 ```
-
----
 
 ### Generate and commit back to the repository
 
@@ -167,8 +161,6 @@ steps:
       commit: "true"
 ```
 
----
-
 ### Custom sizes only
 
 When you know exactly what you need and don't want the full set:
@@ -180,8 +172,6 @@ When you know exactly what you need and don't want the full set:
     preset: custom
     sizes:  "16,32,180,192"
 ```
-
----
 
 ### Use outputs in later steps
 
@@ -203,8 +193,6 @@ When you know exactly what you need and don't want the full set:
       echo "favicon.ico: ${{ steps.favicons.outputs.favicon_ico }}"
     fi
 ```
-
----
 
 ## Adding the HTML snippet to your site
 
@@ -238,8 +226,6 @@ After the first run, copy the contents of `favicon-snippet.html` from `output_pa
 ```
 
 The exact tags in your snippet will vary depending on which `preset` you used.
-
----
 
 ## Generated files
 
